@@ -102,7 +102,6 @@ app.post('/save-pdf', (req, res) => {
     }
 });
 
-// ✅ KHỞI ĐỘNG SERVER
 app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
 });
