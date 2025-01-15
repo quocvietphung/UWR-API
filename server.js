@@ -8,9 +8,7 @@ const path = require('path');
 const app = express();
 const port = process.env.PORT || 3000;
 
-app.use(cors({
-    origin: '*'
-}));
+app.use(cors({ origin: '*' }));
 app.use(express.json({ limit: '1gb' }));
 app.use(express.urlencoded({ limit: '1gb', extended: true }));
 
@@ -21,90 +19,90 @@ app.get('/', (req, res) => {
 });
 
 app.get('/hello-world', (req, res) => {
-    res.json({ message: 'Hello World!' });
+    res.json({ message: 'Hello World! Welcome to my Node.js API' });
 });
 
-app.post('/send-email', (req, res) => {
+app.post('/send-email', async (req, res) => {
     const { to, subject, body, attachments } = req.body;
 
-    const transporter = nodemailer.createTransport({
-        host: 'smtp.ionos.de',
-        auth: {
-            user: 'ub@orgaplan-beratung.de',
-            pass: 'S9ZV2T%wxhy}F+H3'
-        }
-    });
+    if (!to || !subject || !body) {
+        return res.status(400).json({ error: 'Missing required fields: to, subject, or body' });
+    }
 
-    const formattedAttachments = attachments.map((attachment) => {
-        console.log("Path name :",attachment.path);
-        return {
+    try {
+        const transporter = nodemailer.createTransport({
+            host: 'smtp.ionos.de',
+            auth: {
+                user: process.env.EMAIL_USER,
+                pass: process.env.EMAIL_PASS
+            }
+        });
+
+        const formattedAttachments = attachments?.map((attachment) => ({
             filename: attachment.filename,
             path: attachment.path,
             contentType: 'application/pdf',
+        })) || [];
+
+        // Tùy chọn email
+        const mailOptions = {
+            from: process.env.EMAIL_USER,
+            to,
+            subject,
+            text: body,
+            attachments: formattedAttachments
         };
-    });
 
-    const mailOptions = {
-        from: 'ub@orgaplan-beratung.de',
-        to: to,
-        subject: subject,
-        text: body,
-        attachments: formattedAttachments
-    };
+        // Gửi email
+        await transporter.sendMail(mailOptions);
+        res.json({ message: 'Email sent successfully' });
 
-    transporter.sendMail(mailOptions, (error, info) => {
-        if (error) {
-            console.error('Error:', error);
-            res.status(500).json({ error: 'Failed to send email' });
-        } else {
-            console.log('Email sent:', info.response);
-
-            formattedAttachments.forEach(attachment => {
-                fs.rm(attachment.path, { force: true }, (err) => {
-                    if (err) {
-                        console.error('Error:', err);
-                    } else {
-                        console.log('File deleted successfully:', attachment.path);
-                    }
-                });
+        formattedAttachments.forEach(attachment => {
+            fs.rm(attachment.path, { force: true }, (err) => {
+                if (err) {
+                    console.error('Error deleting file:', err);
+                } else {
+                    console.log('File deleted successfully:', attachment.path);
+                }
             });
+        });
 
-            res.json({ message: 'Email sent successfully' });
-        }
-    });
+    } catch (error) {
+        console.error('Error sending email:', error);
+        res.status(500).json({ error: 'Failed to send email' });
+    }
 });
 
 app.post('/save-pdf', (req, res) => {
-    const { filename, pdfData , directoryPath} = req.body;
+    const { filename, pdfData, directoryPath } = req.body;
 
-    console.log("directoryPath",directoryPath)
-
-    // Ensure the directory exists as the first step
-    if (!fs.existsSync(directoryPath)) {
-        fs.mkdirSync(directoryPath, { recursive: true });
+    if (!filename || !pdfData || !directoryPath) {
+        return res.status(400).json({ error: 'Missing required fields: filename, pdfData, or directoryPath' });
     }
 
-    const filePath = path.join(directoryPath, filename);
-
-    if (!pdfData) {
-        console.error('Error: PDF data is missing');
-        res.status(400).json({ error: 'PDF data is missing' });
-        return;
-    }
-
-    // Assuming pdfData is a base64 string
-    const data = pdfData.replace('data:application/pdf;base64,', '');
-    fs.writeFile(filePath, data, 'base64', (error) => {
-        if (error) {
-            console.error('Error:', error.message);
-            res.status(500).json({ error: 'Failed to save PDF' });
-        } else {
-            console.log('PDF saved:', filePath);
-            res.json({ message: 'PDF saved successfully' });
+    try {
+        if (!fs.existsSync(directoryPath)) {
+            fs.mkdirSync(directoryPath, { recursive: true });
         }
-    });
+
+        const filePath = path.join(directoryPath, filename);
+        const data = pdfData.replace(/^data:application\/pdf;base64,/, '');
+
+        fs.writeFile(filePath, data, 'base64', (error) => {
+            if (error) {
+                console.error('Error saving PDF:', error.message);
+                return res.status(500).json({ error: 'Failed to save PDF' });
+            }
+            res.json({ message: 'PDF saved successfully' });
+        });
+
+    } catch (error) {
+        console.error('Error:', error);
+        res.status(500).json({ error: 'An error occurred during file saving' });
+    }
 });
 
+// ✅ KHỞI ĐỘNG SERVER
 app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+    console.log(`Server is running at http://localhost:${port}`);
 });

@@ -1,7 +1,7 @@
 {
   "name": "uwr-api",
   "version": "1.0.0",
-  "description": "API for UWR using Node.js",
+  "description": "API for UWR using Node.js and Express",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
